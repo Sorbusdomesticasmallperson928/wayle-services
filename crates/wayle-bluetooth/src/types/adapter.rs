@@ -1,0 +1,203 @@
+use std::{
+    collections::HashMap,
+    fmt::{Display, Formatter, Result},
+};
+
+use serde::{Deserialize, Serialize};
+use zbus::zvariant::Value;
+
+/// Bluetooth address type for adapters and devices.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AddressType {
+    /// Public Bluetooth address
+    Public,
+    /// Random Bluetooth address (LE)
+    Random,
+}
+
+impl Display for AddressType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            Self::Public => write!(f, "public"),
+            Self::Random => write!(f, "random"),
+        }
+    }
+}
+
+impl From<&str> for AddressType {
+    fn from(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "random" => Self::Random,
+            _ => Self::Public,
+        }
+    }
+}
+
+/// Power state of a Bluetooth adapter.
+///
+/// [experimental]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PowerState {
+    /// Adapter is powered on
+    On,
+    /// Adapter is powered off
+    Off,
+    /// Adapter is transitioning from off to on
+    OffToOn,
+    /// Adapter is transitioning from on to off
+    OnToOff,
+}
+
+impl From<&str> for PowerState {
+    fn from(s: &str) -> Self {
+        match s {
+            "on" => Self::On,
+            "off" => Self::Off,
+            "off-enabling" => Self::OffToOn,
+            "on-disabling" => Self::OnToOff,
+            _ => Self::Off,
+        }
+    }
+}
+
+impl Display for PowerState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            Self::On => write!(f, "on"),
+            Self::Off => write!(f, "off"),
+            Self::OffToOn => write!(f, "off-enabling"),
+            Self::OnToOff => write!(f, "on-disabling"),
+        }
+    }
+}
+
+/// Role capabilities of a Bluetooth adapter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AdapterRole {
+    /// Supports the central role
+    Central,
+    /// Supports the peripheral role
+    Peripheral,
+    /// Supports both central and peripheral roles concurrently
+    CentralPeripheral,
+}
+
+impl From<&str> for AdapterRole {
+    fn from(s: &str) -> Self {
+        match s {
+            "central" => Self::Central,
+            "peripheral" => Self::Peripheral,
+            "central-peripheral" => Self::CentralPeripheral,
+            _ => Self::Central,
+        }
+    }
+}
+
+impl Display for AdapterRole {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            Self::Central => write!(f, "central"),
+            Self::Peripheral => write!(f, "peripheral"),
+            Self::CentralPeripheral => write!(f, "central-peripheral"),
+        }
+    }
+}
+
+/// Discovery transport filter for Bluetooth scanning.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DiscoveryTransport {
+    /// Interleaved scan, use LE, BREDR, or both depending on what's currently enabled
+    Auto,
+    /// BR/EDR inquiry only
+    BrEdr,
+    /// LE scan only
+    Le,
+}
+
+impl Default for DiscoveryTransport {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
+impl From<&str> for DiscoveryTransport {
+    fn from(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "bredr" => Self::BrEdr,
+            "le" => Self::Le,
+            _ => Self::Auto,
+        }
+    }
+}
+
+impl Display for DiscoveryTransport {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            Self::Auto => write!(f, "auto"),
+            Self::BrEdr => write!(f, "bredr"),
+            Self::Le => write!(f, "le"),
+        }
+    }
+}
+
+/// Discovery filter parameters for Bluetooth device discovery.
+pub type DiscoveryFilter<'a> = HashMap<String, Value<'a>>;
+
+/// Options for creating discovery filters with type safety.
+#[derive(Debug, Clone, Default)]
+pub struct DiscoveryFilterOptions<'a> {
+    /// UUIDs to filter for. Only devices advertising these UUIDs will be discovered.
+    pub uuids: Option<Vec<&'a str>>,
+    /// RSSI threshold. Only devices with RSSI >= threshold will be discovered.
+    pub rssi: Option<i16>,
+    /// Pathloss threshold. Only devices with Pathloss <= threshold will be discovered.
+    pub pathloss: Option<u16>,
+    /// Transport type to filter for.
+    pub transport: Option<DiscoveryTransport>,
+    /// Whether to report duplicate advertisement data.
+    pub duplicate_data: Option<bool>,
+    /// Whether to make this client discoverable.
+    pub discoverable: Option<bool>,
+}
+
+impl<'a> DiscoveryFilterOptions<'a> {
+    /// Create a new discovery filter options struct.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Convert options to a discovery filter HashMap.
+    pub fn to_filter(self) -> DiscoveryFilter<'a> {
+        let mut filter = HashMap::new();
+
+        if let Some(uuids) = self.uuids {
+            let uuid_values: Vec<Value> = uuids.into_iter().map(Value::from).collect();
+            filter.insert("UUIDs".to_string(), Value::from(uuid_values));
+        }
+
+        if let Some(rssi) = self.rssi {
+            filter.insert("RSSI".to_string(), Value::from(rssi));
+        }
+
+        if let Some(pathloss) = self.pathloss {
+            filter.insert("Pathloss".to_string(), Value::from(pathloss));
+        }
+
+        if let Some(transport) = self.transport {
+            filter.insert("Transport".to_string(), Value::from(transport.to_string()));
+        }
+
+        if let Some(duplicate_data) = self.duplicate_data {
+            filter.insert("DuplicateData".to_string(), Value::from(duplicate_data));
+        }
+
+        if let Some(discoverable) = self.discoverable {
+            filter.insert("Discoverable".to_string(), Value::from(discoverable));
+        }
+
+        filter
+    }
+}

@@ -1,0 +1,24 @@
+/// Bluetooth service errors
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    /// D-Bus communication error
+    #[error("D-Bus operation failed: {0:#?}")]
+    DbusError(#[from] zbus::Error),
+
+    /// Service initialization failed
+    #[error("Failed to initialize Bluetooth service: {0:#?}")]
+    ServiceInitializationFailed(String),
+
+    /// Agent registration failed
+    #[error("Failed to register agent: {0:#?}")]
+    AgentRegistrationFailed(String),
+
+    /// Bluetooth operation failed
+    #[error("Bluetooth operation failed: {operation} - {reason}")]
+    OperationFailed {
+        /// The operation that failed
+        operation: &'static str,
+        /// The reason the operation failed
+        reason: String,
+    },
+}
